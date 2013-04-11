@@ -28,6 +28,7 @@ BufferManager::BufferManager(const std::string& filename, unsigned size) {
 	numberofpages = length / PAGESIZE;
 	this->lock = new std::mutex;
 	this->globlock = new std::mutex;
+	this->filelock = new std::mutex;
 	this->frames = new BufferFrame*[numberofpages];
 	for (uint i=0; i < numberofpages; i++) frames[i] = nullptr;
 }
@@ -48,6 +49,7 @@ void BufferManager::finish() {
     file->close();
     delete lock;
     delete globlock;
+    delete filelock;
     delete[] frames;
     delete file;
 	//std::cout << "Closed file" << std::endl;
@@ -63,17 +65,17 @@ BufferFrame& BufferManager::fixPage(unsigned pageId, bool exclusive) {
 		std::unique_lock<std::mutex> gl(*globlock);
 		BufferFrame* f = frames[pageId];
 		if (f != nullptr) {
-		    //std::unique_lock<std::mutex> locallock(*f->lock);
+		    std::unique_lock<std::mutex> locallock(*f->lock);
             if (f->fixes == 1)
                 fifolist.remove(f);
             else
                 lrulist.remove(f);
-            //gl.unlock();
+            gl.unlock();
 			if ((exclusive || f->exclusive) && f->threadcount > 0) {
 				f->threadwaiters++;
                 waiting = true;
-				//f->waiter->wait(locallock);
-				f->waiter->wait(gl);
+				f->waiter->wait(locallock);
+				//f->waiter->wait(gl);
 			} else {
 				//if (f->threadwaiters > 0) f->threadwaiters--;
 				if (waiting) f->threadwaiters--;
@@ -94,11 +96,9 @@ BufferFrame& BufferManager::fixPage(unsigned pageId, bool exclusive) {
                 BufferFrame* f = new BufferFrame(pageId, exclusive, std::this_thread::get_id());
 		        std::unique_lock<std::mutex> locallock(*f->lock);
 				frames[pageId] = f;
-                //gl.unlock();
+                gl.unlock();
                 char* data = readFrame(pageId);
                 f->data = data;
-				//BufferFrame* f = new BufferFrame(pageId, data, exclusive, std::this_thread::get_id());
-				//frames[pageId] = f;
 				return *f;
 			}
 		}
@@ -114,6 +114,7 @@ void BufferManager::unfixPage(BufferFrame& frame, bool isDirty) {
 		throw "Invalid BufferFrame";
 	}
     std::unique_lock<std::mutex> locallock(*f2->lock);
+    l.unlock();
 	f2->isDirty = (isDirty || f2->isDirty);
 	if (f2->threadcount <= 1 && f2->threadwaiters == 0) {
         if (f2->fixes == 1)
@@ -129,11 +130,13 @@ void BufferManager::unfixPage(BufferFrame& frame, bool isDirty) {
 
 
 void BufferManager::writeFrame(BufferFrame* frame) {
+    std::unique_lock<std::mutex> l(*filelock);
 	file->seekp(frame->pageId*PAGESIZE);
 	file->write(frame->data, PAGESIZE);
 }
 
 char* BufferManager::readFrame(uint pageId) {
+    std::unique_lock<std::mutex> l(*filelock);
 	char* data = new char[PAGESIZE];
 	file->seekg(pageId*PAGESIZE);
     memset(data, 0, PAGESIZE*sizeof(char));
@@ -144,7 +147,6 @@ char* BufferManager::readFrame(uint pageId) {
 
 bool BufferManager::freeFrame() {
     //std::cout << "freeFrame called\n";
-    /*
     BufferFrame* frame;
     if (fifolist.empty()) { // take element from lrulist
         if (lrulist.empty())
@@ -162,8 +164,7 @@ bool BufferManager::freeFrame() {
     delete frame;
     freeframes++;
     return true; 
-    */
-    
+    /* 
 	for (uint i=0; i < numberofpages; i++) {
 		BufferFrame* frame = frames[i];
 		if (frame == nullptr) continue;
@@ -171,6 +172,7 @@ bool BufferManager::freeFrame() {
 		//std::cout << frame->pageId <<" : " << frame->isUsed << "\n";
 		if (frame->threadcount == 0 && frame->threadwaiters == 0) {
             std::unique_lock<std::mutex> l(*frame->lock);
+            if (frames[i] == frame && frame->threadcount == 0 && frame->threadwaiters == 0) {
 			if (frame->isDirty) writeFrame(frame);
 			//printf("Freeing page %u\n", frame->pageId);
 			frames[i] = nullptr;
@@ -181,9 +183,11 @@ bool BufferManager::freeFrame() {
 			freeframes++;
 			//std::cout << "Found frame to clear up\n";
 			return true;
+            }
 		}
 	}
 	return false;
+    */
 }
 
 
@@ -193,6 +197,8 @@ BufferFrame::BufferFrame(uint pageId, char* data, bool exclusive, std::thread::i
 	this->exclusive = exclusive;
 	this->lock = new std::mutex;
 	this->waiter = new std::condition_variable;
+    //this->threadcount = 1;
+    //this->threadwaiters = 0;
 }
 
 BufferFrame::BufferFrame(uint pageId, bool exclusive, std::thread::id thread1) {
@@ -212,10 +218,4 @@ BufferFrame::~BufferFrame() {
 void* BufferFrame::getData() {
 	return (void*)data;
 }
-
-uint BufferFrame::getPageid() {
-	return pageId;
-}
-
-
 

@@ -14,6 +14,7 @@
 #include <thread>
 #include <mutex>
 #include <condition_variable>
+#include <atomic>
 
 const int PAGESIZE = 4096;
 
@@ -25,8 +26,8 @@ class BufferFrame {
 	uint pageId;
 	bool exclusive;
 	char* data;
-	volatile uint threadcount = 1;
-	volatile uint threadwaiters = 0;
+    std::atomic_uint threadcount{1}; 
+    std::atomic_uint threadwaiters{0};
     volatile uint fixes = 1;
 	std::condition_variable* waiter;
 	std::mutex* lock;
@@ -37,7 +38,6 @@ class BufferFrame {
 	~BufferFrame();
 public:
 	void* getData();
-	uint getPageid();
 };
 
 class BufferManager {
@@ -51,6 +51,7 @@ class BufferManager {
 	std::condition_variable waiter;
 	std::mutex* lock;
 	std::mutex* globlock;
+	std::mutex* filelock;
 	void writeFrame(BufferFrame* frame);
 	char* readFrame(uint pageId);
 	bool freeFrame();

@@ -28,16 +28,14 @@ class BufferFrame {
 	volatile uint threadcount = 1;
 	volatile uint threadwaiters = 0;
     volatile uint fixes = 1;
-	//std::unordered_map<std::thread::id, bool> threads;
-	//std::list<std::condition_variable*> waitingthreads;
 	std::condition_variable* waiter;
 	std::mutex* lock;
 	bool isDirty = false;
-	bool isUsed = true;
 	friend BufferManager;
 	BufferFrame(uint pageId, char* data, bool exclusive, std::thread::id thread1);
-public:
+	BufferFrame(uint pageId, bool exclusive, std::thread::id thread1);
 	~BufferFrame();
+public:
 	void* getData();
 	uint getPageid();
 };
@@ -56,13 +54,13 @@ class BufferManager {
 	void writeFrame(BufferFrame* frame);
 	char* readFrame(uint pageId);
 	bool freeFrame();
+	void finish();
 public:
 	BufferManager(const std::string& filename, unsigned size);
 	~BufferManager();
 	BufferFrame& fixPage(unsigned pageId, bool exclusive);
 	void unfixPage(BufferFrame& frame, bool isDirty);
 	BufferFrame& newPage(bool exclusive);
-	void finish();
 };
 
 #endif /* BUFFERMANAGER_HPP_ */

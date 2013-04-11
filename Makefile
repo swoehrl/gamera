@@ -1,7 +1,8 @@
 CC = g++
 #CC = clang++
 DEBUG = -O0 -g3
-RELASE = -O3 
+RELASE = -O3
+TBBFLAGS = -Ilib/tbb/include -ltbb -Llib/tbb/lib/intel64/gcc4.4
 FLAGS = -Wall -fmessage-length=0 -std=c++11 -pthread #-gcc-toolchain /opt/gcc-4.8.0
 GTEST_DIR = lib/gtest-1.6.0
 LIB_DIR = lib
@@ -20,6 +21,9 @@ build/buffermanager.o: src/buffermanager.cpp src/buffermanager.hpp
 lib/gtest-1.6.0.zip:
 	wget http://googletest.googlecode.com/files/gtest-1.6.0.zip -O lib/gtest-1.6.0.zip
 	unzip lib/gtest-1.6.0.zip -d lib/
+
+build/intel: src/inteltest.cpp
+	$(CC) $(DEBUG) $(FLAGS) $(TBBFLAGS) src/inteltest.cpp -o build/intel
 
 build/libgtest.a: lib/gtest-1.6.0.zip
 	$(CC) -I${GTEST_DIR}/include -I${GTEST_DIR} -c ${GTEST_DIR}/src/gtest-all.cc -o build/gtest-all.o

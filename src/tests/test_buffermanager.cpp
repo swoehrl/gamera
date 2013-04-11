@@ -5,6 +5,7 @@
 #include <pthread.h>
 #include <iostream>
 #include "buffermanager.hpp"
+#include <thread>
 
 using namespace std;
 
@@ -139,6 +140,9 @@ TEST(BufferManagerTest, SingleThreadTest) {
 TEST(BufferManagerTest, 8ThreadTest) {
     EXPECT_EQ(runtest(100, 20, 8, "database.file"), 0);
 }
+TEST(BufferManagerTest, 1ThreadTest) {
+    EXPECT_EQ(runtest(100, 20, 1, "database.file"), 0);
+}
 
 TEST(BufferManagerTest, Simple) {
     BufferManager* bm = new BufferManager("database.file", 20);
@@ -147,6 +151,48 @@ TEST(BufferManagerTest, Simple) {
         bm->unfixPage(bf, true);
     }
     //bm->~BufferManager();
+    delete bm;
+}
+
+void compete(BufferManager* bm, uint pageId) {
+    for (int i=0; i < 1000; i++) {
+        //std::cout << "fixPage for page = " << pageId << "\n";
+        BufferFrame& bf = bm->fixPage(pageId, true);
+        int* data = (int*)bf.getData();
+        data[0]++;
+        //std::this_thread::sleep_for(std::chrono::milliseconds(2));
+        bm->unfixPage(bf, true);
+    }
+}
+
+TEST(BufferManagerTest, Compete) {
+    BufferManager* bm = new BufferManager("database.file", 1);
+    BufferFrame& bf = bm->fixPage(1, true);
+    int* data = (int*)bf.getData();
+    data[0] = 0;
+    bm->unfixPage(bf, true);
+    BufferFrame& bf2 = bm->fixPage(2, true);
+    data = (int*)bf2.getData();
+    data[0] = 0;
+    bm->unfixPage(bf2, true);
+    std::thread t1(compete, bm, 1);
+    std::thread t2(compete, bm, 2);
+    std::thread t3(compete, bm, 3);
+    std::thread t4(compete, bm, 4);
+    t1.join();
+    t2.join();
+    t3.join();
+    t4.join();
+    BufferFrame& bf3 = bm->fixPage(1, true);
+    data = (int*)bf3.getData();
+    ASSERT_EQ(data[0], 1000);
+    //std::cout <<"data[0] for page 1 = " << data[0] << "\n";
+    bm->unfixPage(bf3, true);
+    BufferFrame& bf4 = bm->fixPage(2, true);
+    data = (int*)bf4.getData();
+    ASSERT_EQ(data[0], 1000);
+    //std::cout <<"data[0] for page 2 = " << data[0] << "\n";
+    bm->unfixPage(bf4, true);
     delete bm;
 }
 

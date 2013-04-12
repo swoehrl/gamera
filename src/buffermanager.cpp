@@ -107,14 +107,13 @@ BufferFrame& BufferManager::fixPage(unsigned pageId, bool exclusive) {
 
 
 void BufferManager::unfixPage(BufferFrame& frame, bool isDirty) {
-	std::unique_lock<std::mutex> l(*globlock);
+	std::unique_lock<std::mutex> gl(*globlock);
 	BufferFrame* f2 = frames[frame.pageId];
 	if (f2 == nullptr) {
 		std::cout << "Error: Invalid BufferFrame\n";
 		throw "Invalid BufferFrame";
 	}
     std::unique_lock<std::mutex> locallock(*f2->lock);
-    l.unlock();
 	f2->isDirty = (isDirty || f2->isDirty);
 	if (f2->threadcount <= 1 && f2->threadwaiters == 0) {
         if (f2->fixes == 1)
@@ -125,6 +124,7 @@ void BufferManager::unfixPage(BufferFrame& frame, bool isDirty) {
 	} else if (f2->threadcount <= 1 && f2->threadwaiters > 0) {
 		f2->waiter->notify_one();
     }
+    gl.unlock();
 	f2->threadcount--;
 }
 
@@ -164,30 +164,6 @@ bool BufferManager::freeFrame() {
     delete frame;
     freeframes++;
     return true; 
-    /* 
-	for (uint i=0; i < numberofpages; i++) {
-		BufferFrame* frame = frames[i];
-		if (frame == nullptr) continue;
-		//std::unique_lock<std::mutex> l(*frame->lock);
-		//std::cout << frame->pageId <<" : " << frame->isUsed << "\n";
-		if (frame->threadcount == 0 && frame->threadwaiters == 0) {
-            std::unique_lock<std::mutex> l(*frame->lock);
-            if (frames[i] == frame && frame->threadcount == 0 && frame->threadwaiters == 0) {
-			if (frame->isDirty) writeFrame(frame);
-			//printf("Freeing page %u\n", frame->pageId);
-			frames[i] = nullptr;
-            //frame->~BufferFrame();
-			//frame->waiter->notify_all();
-			l.unlock();
-			delete frame;
-			freeframes++;
-			//std::cout << "Found frame to clear up\n";
-			return true;
-            }
-		}
-	}
-	return false;
-    */
 }
 
 
@@ -197,8 +173,6 @@ BufferFrame::BufferFrame(uint pageId, char* data, bool exclusive, std::thread::i
 	this->exclusive = exclusive;
 	this->lock = new std::mutex;
 	this->waiter = new std::condition_variable;
-    //this->threadcount = 1;
-    //this->threadwaiters = 0;
 }
 
 BufferFrame::BufferFrame(uint pageId, bool exclusive, std::thread::id thread1) {
@@ -209,7 +183,6 @@ BufferFrame::BufferFrame(uint pageId, bool exclusive, std::thread::id thread1) {
 }
 
 BufferFrame::~BufferFrame() {
-    //std::cout << "Calling BufferFrame destructor\n";
 	delete[] data;
     delete this->lock;
     delete this->waiter;

@@ -42,6 +42,7 @@ public:
 
 class BufferManager {
 	BufferFrame** frames;
+    uint* pagefixes;
     std::list<BufferFrame*> fifolist;
     std::list<BufferFrame*> lrulist;
 	std::fstream *file;
@@ -55,7 +56,6 @@ class BufferManager {
 	void writeFrame(BufferFrame* frame);
 	char* readFrame(uint pageId);
 	bool freeFrame();
-	void finish();
 public:
 	BufferManager(const std::string& filename, unsigned size);
 	~BufferManager();

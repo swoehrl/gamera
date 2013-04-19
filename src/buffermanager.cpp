@@ -30,14 +30,14 @@ BufferManager::BufferManager(const std::string& filename, unsigned size) {
 	this->globlock = new std::mutex;
 	this->filelock = new std::mutex;
 	this->frames = new BufferFrame*[numberofpages];
-	for (uint i=0; i < numberofpages; i++) frames[i] = nullptr;
+	this->pagefixes = new uint[numberofpages];
+	for (uint i=0; i < numberofpages; i++) {
+        frames[i] = nullptr;
+        pagefixes[i] = 0;
+    }
 }
 
 BufferManager::~BufferManager() {
-	finish();
-}
-
-void BufferManager::finish() {
 	for (uint i=0; i<numberofpages; i++) {
 		BufferFrame* frame = frames[i];
 		if (frame != nullptr) {
@@ -51,8 +51,8 @@ void BufferManager::finish() {
     delete globlock;
     delete filelock;
     delete[] frames;
+    delete[] pagefixes;
     delete file;
-	//std::cout << "Closed file" << std::endl;
 }
 
 BufferFrame& BufferManager::fixPage(unsigned pageId, bool exclusive) {
@@ -60,32 +60,33 @@ BufferFrame& BufferManager::fixPage(unsigned pageId, bool exclusive) {
 		std::cout << "Error: PageId is invalid\n";
 		throw "pageId is invalid";
 	}
-    bool waiting = false;
+    int waiting = 0;
 	while (true) {
 		std::unique_lock<std::mutex> gl(*globlock);
 		BufferFrame* f = frames[pageId];
 		if (f != nullptr) {
 		    std::unique_lock<std::mutex> locallock(*f->lock);
-            if (f->fixes == 1)
+            //if (f->fixes == 1)
+            //if (pagefixes[pageId] == 1)
                 fifolist.remove(f);
-            else
+            //else
                 lrulist.remove(f);
             gl.unlock();
 			if ((exclusive || f->exclusive) && f->threadcount > 0) {
 				f->threadwaiters++;
-                waiting = true;
+                waiting++;
 				f->waiter->wait(locallock);
-				//f->waiter->wait(gl);
 			} else {
-				//if (f->threadwaiters > 0) f->threadwaiters--;
-				if (waiting) f->threadwaiters--;
+				f->threadwaiters-= waiting;
 				f->threadcount++;
-                f->fixes++;
+                //f->fixes++;
+                pagefixes[pageId]++;
 				f->exclusive = exclusive;
 				return *f;
 			}
 		} else {
 			if (freeframes <= 0 && !freeFrame()) {
+                //std::cout << "Waiting for free frame\n";
 				waiter.wait(gl, [this](){freeFrame(); return freeframes >= 1;});
 				if (freeframes <= 0) {
 					std::cout << "Error: no free frames\n";
@@ -93,6 +94,7 @@ BufferFrame& BufferManager::fixPage(unsigned pageId, bool exclusive) {
 				}
 			} else {
 				freeframes--;
+                pagefixes[pageId]++;
                 BufferFrame* f = new BufferFrame(pageId, exclusive, std::this_thread::get_id());
 		        std::unique_lock<std::mutex> locallock(*f->lock);
 				frames[pageId] = f;
@@ -115,16 +117,24 @@ void BufferManager::unfixPage(BufferFrame& frame, bool isDirty) {
 	}
     std::unique_lock<std::mutex> locallock(*f2->lock);
 	f2->isDirty = (isDirty || f2->isDirty);
-	if (f2->threadcount <= 1 && f2->threadwaiters == 0) {
+	if (f2->threadcount <= 1 && f2->threadwaiters < 1) {
+        /*
         if (f2->fixes == 1)
             fifolist.push_back(f2);
         else
             lrulist.push_back(f2);
+        */
+        if (pagefixes[frame.pageId] == 1)
+            fifolist.push_back(f2);
+        else
+            lrulist.push_back(f2);
+        gl.unlock();
         waiter.notify_one();
 	} else if (f2->threadcount <= 1 && f2->threadwaiters > 0) {
+        gl.unlock();
 		f2->waiter->notify_one();
-    }
-    gl.unlock();
+    } else
+        gl.unlock();
 	f2->threadcount--;
 }
 
@@ -149,8 +159,10 @@ bool BufferManager::freeFrame() {
     //std::cout << "freeFrame called\n";
     BufferFrame* frame;
     if (fifolist.empty()) { // take element from lrulist
-        if (lrulist.empty())
+        if (lrulist.empty()) {
+            //std::cout << "Kein Frame frei\n";
             return false;
+        }
         frame = lrulist.front();
         lrulist.pop_front();
     } else {

@@ -123,7 +123,7 @@ int runtest(int pod, int pir, int tc, const char* dbfile) {
    delete bm;
    delete[] threadSeed;
    if (totalCount==totalCountOnDisk) {
-      std::cout << "test successful" << endl;
+      //std::cout << "test successful" << endl;
       return 0;
    } else {
       std::cerr << "error: expected " << totalCount << " but got " << totalCountOnDisk << endl;

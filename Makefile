@@ -7,6 +7,7 @@ FLAGS = -Wall -fmessage-length=0 -std=c++11 -pthread #-gcc-toolchain /opt/gcc-4.
 GTEST_DIR = lib/gtest-1.6.0
 LIB_DIR = lib
 TEST_FLAGS = $(DEBUG) -I$(GTEST_DIR)/include -Isrc -pthread -lpthread
+build_dir = @mkdir -p $(dir $@)
 
 all: build/mergesort.o build/buffermanager.o
 
@@ -40,6 +41,10 @@ build/test_buffermanager: build/libgtest.a src/tests/test_buffermanager.cpp buil
 
 build/pqtest: src/pqtest.cpp
 	$(CC) $(FLAGS) src/pqtest.cpp -o build/pqtest
+
+init:
+	mkdir -p build lib
+	dd if=/dev/zero of=database.file bs=1024 count=102400
 
 clean:
 	rm build/*

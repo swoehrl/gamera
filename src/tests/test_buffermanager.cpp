@@ -137,6 +137,12 @@ TEST(BufferManagerTest, SingleThreadTest) {
 }
 */
 
+TEST(BufferManagerTest, 300ThreadTest) {
+    EXPECT_EQ(runtest(100, 20, 300, "database.file"), 0);
+}
+TEST(BufferManagerTest, 100ThreadTest) {
+    EXPECT_EQ(runtest(100, 20, 100, "database.file"), 0);
+}
 TEST(BufferManagerTest, 8ThreadTest) {
     EXPECT_EQ(runtest(100, 20, 8, "database.file"), 0);
 }

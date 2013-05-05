@@ -4,5 +4,5 @@ lib/*
 *~
 test.num
 testout.num
-database.file
+*database.file
 core

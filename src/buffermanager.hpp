@@ -16,7 +16,7 @@
 #include <condition_variable>
 #include <atomic>
 
-const int PAGESIZE = 4096;
+const int PAGESIZE = 16*1024;
 
 
 
@@ -38,6 +38,7 @@ class BufferFrame {
 	~BufferFrame();
 public:
 	void* getData();
+    bool isExclusive() {return exclusive;};
 };
 
 class BufferManager {
@@ -45,6 +46,7 @@ class BufferManager {
     uint* pagefixes;
     std::list<BufferFrame*> fifolist;
     std::list<BufferFrame*> lrulist;
+    std::list<BufferFrame*> seclrulist;
 	std::fstream *file;
 	uint numberofpages;
 	volatile uint freeframes;

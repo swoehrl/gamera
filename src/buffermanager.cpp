@@ -12,17 +12,30 @@
 #include <fstream>
 #include <thread>
 #include <algorithm>
+#include <sys/stat.h>
 
 #include "buffermanager.hpp"
 
+const bool DEBUG = false;
 
 BufferManager::BufferManager(const std::string& filename, unsigned size) {
+    struct stat st;
+    if (stat(filename.c_str(), &st) != 0) {
+        std::cout << "Error: File not found" << std::endl;
+        throw "File not found";
+    }
+    int length = st.st_size;
+
 	std::fstream* f = new(std::fstream);
 	f->open(filename.c_str(), std::ios::binary | std::ios::in | std::ios::out);
-	file = f;
-    file->seekg (0, file->end);
-    int length = file->tellg();
-    file->seekg (0, file->beg);
+    if (!f->is_open()) { 
+        std::cout << "Error: IO Error" << std::endl;
+        throw "IO Error";
+    }
+    file = f;
+    //file->seekg (0, file->end);
+    //int length = file->tellg();
+    //file->seekg (0, file->beg);
 	maxframes = size;
 	freeframes = size;
 	numberofpages = length / PAGESIZE;
@@ -38,6 +51,7 @@ BufferManager::BufferManager(const std::string& filename, unsigned size) {
 }
 
 BufferManager::~BufferManager() {
+    //std::cout << "Destructor called\n";
 	for (uint i=0; i<numberofpages; i++) {
 		BufferFrame* frame = frames[i];
 		if (frame != nullptr) {
@@ -56,6 +70,7 @@ BufferManager::~BufferManager() {
 }
 
 BufferFrame& BufferManager::fixPage(unsigned pageId, bool exclusive) {
+    if (DEBUG) std::cout << "Fixing page " << pageId << std::endl;
 	if (pageId >= numberofpages) {
 		std::cout << "Error: PageId is invalid\n";
 		throw "pageId is invalid";
@@ -71,6 +86,7 @@ BufferFrame& BufferManager::fixPage(unsigned pageId, bool exclusive) {
                 fifolist.remove(f);
             //else
                 lrulist.remove(f);
+                seclrulist.remove(f);
             gl.unlock();
 			if ((exclusive || f->exclusive) && f->threadcount > 0) {
 				f->threadwaiters++;
@@ -79,8 +95,8 @@ BufferFrame& BufferManager::fixPage(unsigned pageId, bool exclusive) {
 			} else {
 				f->threadwaiters-= waiting;
 				f->threadcount++;
-                //f->fixes++;
                 pagefixes[pageId]++;
+                f->fixes++;
 				f->exclusive = exclusive;
 				return *f;
 			}
@@ -109,6 +125,7 @@ BufferFrame& BufferManager::fixPage(unsigned pageId, bool exclusive) {
 
 
 void BufferManager::unfixPage(BufferFrame& frame, bool isDirty) {
+    if (DEBUG) std::cout << "Unfixing page " << frame.pageId << std::endl;
 	std::unique_lock<std::mutex> gl(*globlock);
 	BufferFrame* f2 = frames[frame.pageId];
 	if (f2 == nullptr) {
@@ -124,7 +141,9 @@ void BufferManager::unfixPage(BufferFrame& frame, bool isDirty) {
         else
             lrulist.push_back(f2);
         */
-        if (pagefixes[frame.pageId] == 1)
+        if (frame.fixes > 1)
+            seclrulist.push_back(f2);
+        else if (pagefixes[frame.pageId] == 1)
             fifolist.push_back(f2);
         else
             lrulist.push_back(f2);
@@ -141,6 +160,7 @@ void BufferManager::unfixPage(BufferFrame& frame, bool isDirty) {
 
 void BufferManager::writeFrame(BufferFrame* frame) {
     std::unique_lock<std::mutex> l(*filelock);
+    if (DEBUG) std::cout << "Writing frame " << frame->pageId << std::endl;
 	file->seekp(frame->pageId*PAGESIZE);
 	file->write(frame->data, PAGESIZE);
 }
@@ -160,11 +180,17 @@ bool BufferManager::freeFrame() {
     BufferFrame* frame;
     if (fifolist.empty()) { // take element from lrulist
         if (lrulist.empty()) {
-            //std::cout << "Kein Frame frei\n";
-            return false;
+            if (seclrulist.empty()) {
+                //std::cout << "Kein Frame frei\n";
+                return false;
+            } else {
+                frame = seclrulist.front();
+                seclrulist.pop_front();
+            }
+        } else {
+            frame = lrulist.front();
+            lrulist.pop_front();
         }
-        frame = lrulist.front();
-        lrulist.pop_front();
     } else {
         frame = fifolist.front();
         fifolist.pop_front();

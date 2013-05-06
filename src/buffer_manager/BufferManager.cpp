@@ -1,10 +1,3 @@
-/*
- * buffermanager.cpp
- *
- *  Created on: 09.03.2013
- *      Author: swoehrl
- */
-
 
 #include <iostream>
 #include <cstdio>
@@ -14,7 +7,7 @@
 #include <algorithm>
 #include <sys/stat.h>
 
-#include "buffermanager.hpp"
+#include "buffer_manager/BufferManager.hpp"
 
 const bool DEBUG = false;
 
@@ -205,28 +198,4 @@ bool BufferManager::freeFrame() {
 }
 
 
-BufferFrame::BufferFrame(uint pageId, char* data, bool exclusive, std::thread::id thread1) {
-	this->pageId = pageId;
-	this->data = data;
-	this->exclusive = exclusive;
-	this->lock = new std::mutex;
-	this->waiter = new std::condition_variable;
-}
-
-BufferFrame::BufferFrame(uint pageId, bool exclusive, std::thread::id thread1) {
-	this->pageId = pageId;
-	this->exclusive = exclusive;
-	this->lock = new std::mutex;
-	this->waiter = new std::condition_variable;
-}
-
-BufferFrame::~BufferFrame() {
-	delete[] data;
-    delete this->lock;
-    delete this->waiter;
-}
-
-void* BufferFrame::getData() {
-	return (void*)data;
-}
 

@@ -1,9 +1,3 @@
-/*
- * buffermanager.hpp
- *
- *  Created on: 09.03.2013
- *      Author: swoehrl
- */
 
 #ifndef BUFFERMANAGER_HPP_
 #define BUFFERMANAGER_HPP_
@@ -16,30 +10,9 @@
 #include <condition_variable>
 #include <atomic>
 
-const int PAGESIZE = 16*1024;
 
+#include "buffer_manager/BufferFrame.hpp"
 
-
-class BufferManager;
-
-class BufferFrame {
-	uint pageId;
-	bool exclusive;
-	char* data;
-    std::atomic_uint threadcount{1}; 
-    std::atomic_uint threadwaiters{0};
-    volatile uint fixes = 1;
-	std::condition_variable* waiter;
-	std::mutex* lock;
-	bool isDirty = false;
-	friend BufferManager;
-	BufferFrame(uint pageId, char* data, bool exclusive, std::thread::id thread1);
-	BufferFrame(uint pageId, bool exclusive, std::thread::id thread1);
-	~BufferFrame();
-public:
-	void* getData();
-    bool isExclusive() {return exclusive;};
-};
 
 class BufferManager {
 	BufferFrame** frames;
@@ -66,4 +39,4 @@ public:
 	BufferFrame& newPage(bool exclusive);
 };
 
-#endif /* BUFFERMANAGER_HPP_ */
+#endif 

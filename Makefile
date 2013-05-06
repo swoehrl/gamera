@@ -14,15 +14,17 @@ srcDir:= src/
 
 #obj_files := $(addprefix $(objDir),$(src_files))
 
-all: build/mergesort.o build/buffermanager.o
+all: build/mergesort.o build/BufferManager.o build/SegmentManager.o
 
 test: build/test1 build/test_mergesort build/test_buffermanager build/test_segmentmanager
 
 build/mergesort.o: src/mergesort.cpp
 	$(CC) $(DEBUG) $(FLAGS) -c src/mergesort.cpp -o build/mergesort.o
 
-build/buffermanager.o: src/buffermanager.cpp src/buffermanager.hpp
-	$(CC) $(DEBUG) $(FLAGS) -c src/buffermanager.cpp -o build/buffermanager.o
+build/BufferManager.o: src/buffer_manager/*
+	$(COMP) -c src/buffer_manager/BufferFrame.cpp -o build/BufferFrame.o
+	$(COMP) -c src/buffer_manager/BufferManager.cpp -o build/BufferManager.o
+
 
 SEGMENT_SRC = src/segment_manager/*.cpp
 SEGMENT_OBJ = $(SEGMENT_SRC:src/segment_manager/%.cpp=build/%.o)
@@ -50,11 +52,11 @@ build/test1: build/libgtest.a src/tests/test1.cpp
 build/test_mergesort: build/libgtest.a src/tests/test_mergesort.cpp build/mergesort.o 
 	$(CC) $(FLAGS) $(TEST_FLAGS) src/tests/test_mergesort.cpp build/mergesort.o build/libgtest.a -o build/test_mergesort
 
-build/test_buffermanager: build/libgtest.a src/tests/test_buffermanager.cpp build/buffermanager.o
-	$(CC) $(FLAGS) $(TEST_FLAGS) src/tests/test_buffermanager.cpp build/buffermanager.o build/libgtest.a -o build/test_buffermanager
+build/test_buffermanager: build/libgtest.a src/tests/BufferManagerTest.cpp build/BufferManager.o
+	$(CC) $(FLAGS) $(TEST_FLAGS) src/tests/BufferManagerTest.cpp build/BufferFrame.o build/BufferManager.o build/libgtest.a -o build/test_buffermanager
 
 
-build/test_segmentmanager: build/libgtest.a src/tests/SegmentManagerTest.cpp build/SegmentManager.o build/buffermanager.o
+build/test_segmentmanager: build/libgtest.a src/tests/SegmentManagerTest.cpp build/SegmentManager.o build/BufferManager.o
 	$(CC) $(FLAGS) $(TEST_FLAGS) src/tests/SegmentManagerTest.cpp $(SEGMENT_OBJ) build/libgtest.a -Isrc -o build/test_segmentmanager
 
 

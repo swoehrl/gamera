@@ -1,11 +1,14 @@
-#include <gtest/gtest.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <assert.h>
 #include <pthread.h>
 #include <iostream>
-#include "buffermanager.hpp"
 #include <thread>
+
+#include <gtest/gtest.h>
+
+#include "buffer_manager/BufferManager.hpp"
+
 
 using namespace std;
 

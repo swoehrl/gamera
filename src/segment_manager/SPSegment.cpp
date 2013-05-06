@@ -68,6 +68,8 @@ TID SPSegment::insert(const Record& r) {
                     }
                     break;
                 }
+            } else {
+                freeslots = 0;
             }
             if (++offset > 63) {
                 bitmap++;

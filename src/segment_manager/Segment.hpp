@@ -7,7 +7,7 @@
 
 #include "segment_manager/SegmentBase.hpp"
 #include "segment_manager/SegmentManager.hpp"
-#include "buffermanager.hpp"
+#include "buffer_manager/BufferManager.hpp"
 
 
 class Segment {

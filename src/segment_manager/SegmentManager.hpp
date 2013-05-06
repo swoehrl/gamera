@@ -4,7 +4,7 @@
 #include <unordered_map>
 
 #include "segment_manager/SegmentBase.hpp"
-#include "buffermanager.hpp"
+#include "buffer_manager/BufferManager.hpp"
 #include "segment_manager/Segment.hpp"
 #include "segment_manager/SegmentInventory.hpp"
 
